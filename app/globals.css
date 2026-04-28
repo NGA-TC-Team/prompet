@@ -1,26 +1,170 @@
 @import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Modern monochrome — pure neutral token palette.
+   The only chromatic accents in the app are user-chosen tag colors,
+   which read as intentional ink-on-paper highlights against this gray shell.
+   ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: oklch(0.99 0 0);
+  --foreground: oklch(0.16 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.16 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.16 0 0);
+  --primary: oklch(0.16 0 0);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0 0);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.46 0 0);
+  --accent: oklch(0.94 0 0);
+  --accent-foreground: oklch(0.16 0 0);
+  --destructive: oklch(0.45 0 0);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.4 0 0);
+  --radius: 0.5rem;
+}
+
+.dark {
+  --background: oklch(0.13 0 0);
+  --foreground: oklch(0.97 0 0);
+  --card: oklch(0.17 0 0);
+  --card-foreground: oklch(0.97 0 0);
+  --popover: oklch(0.17 0 0);
+  --popover-foreground: oklch(0.97 0 0);
+  --primary: oklch(0.97 0 0);
+  --primary-foreground: oklch(0.16 0 0);
+  --secondary: oklch(0.22 0 0);
+  --secondary-foreground: oklch(0.97 0 0);
+  --muted: oklch(0.22 0 0);
+  --muted-foreground: oklch(0.7 0 0);
+  --accent: oklch(0.25 0 0);
+  --accent-foreground: oklch(0.97 0 0);
+  --destructive: oklch(0.78 0 0);
+  --destructive-foreground: oklch(0.13 0 0);
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: oklch(0.7 0 0);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* Editorial display for headlines and dialog titles. */
+.font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+}
+
+/* Hover redraw — strokes of a Lucide icon are progressively re-drawn from
+   one end to the other. We hold the longest typical path length (~60) and
+   add a generous safety margin so all paths complete the dash sweep. */
+.icon-redraw svg {
+  overflow: visible;
+}
+.icon-redraw svg path,
+.icon-redraw svg line,
+.icon-redraw svg polyline,
+.icon-redraw svg polygon,
+.icon-redraw svg rect,
+.icon-redraw svg circle {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 0;
+}
+.icon-redraw:hover svg path,
+.icon-redraw:hover svg line,
+.icon-redraw:hover svg polyline,
+.icon-redraw:hover svg polygon,
+.icon-redraw:hover svg rect,
+.icon-redraw:hover svg circle,
+.icon-redraw:focus-visible svg path,
+.icon-redraw:focus-visible svg line,
+.icon-redraw:focus-visible svg polyline,
+.icon-redraw:focus-visible svg polygon,
+.icon-redraw:focus-visible svg rect,
+.icon-redraw:focus-visible svg circle {
+  animation: prompet-redraw 1.1s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+@keyframes prompet-redraw {
+  from { stroke-dashoffset: 120; }
+  to   { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .icon-redraw:hover svg path,
+  .icon-redraw:hover svg line,
+  .icon-redraw:hover svg polyline,
+  .icon-redraw:hover svg polygon,
+  .icon-redraw:hover svg rect,
+  .icon-redraw:hover svg circle {
+    animation: none;
+  }
+}
+
+/* Selection — pure ink. */
+::selection {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+/* Theme circular reveal — used by ThemeToggle via document.startViewTransition. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 1;
+}
+::view-transition-new(root) {
+  z-index: 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.001ms !important;
+  }
 }
