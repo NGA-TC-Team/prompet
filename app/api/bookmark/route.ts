@@ -1,7 +1,14 @@
 import { z } from "zod";
+import { consume, getLimiter, ipFromRequest } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const limiter = getLimiter("bookmark", {
+  windowMs: 60_000,
+  perIp: 12, // a careful user can paste ~1 URL / 5s; well within
+  global: 200, // soft global ceiling so one attacker rotating IPs still hits a wall
+});
 
 const bodySchema = z.object({
   url: z
@@ -17,6 +24,26 @@ const PRIVATE_HOST_RE =
   /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$|fc|fd|fe80:)/i;
 
 export async function POST(request: Request) {
+  const ip = ipFromRequest(request);
+  const verdict = consume(limiter, ip);
+  if (!verdict.ok) {
+    return new Response(
+      JSON.stringify({
+        error: "요청이 너무 많습니다. 잠시 후 다시 시도하세요.",
+        retryAfter: verdict.retryAfter,
+      }),
+      {
+        status: 429,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": String(verdict.retryAfter),
+          "x-ratelimit-limit": String(verdict.limit),
+          "x-ratelimit-remaining": "0",
+        },
+      },
+    );
+  }
+
   let parsed: { url: string };
   try {
     parsed = bodySchema.parse(await request.json());
@@ -69,11 +96,20 @@ export async function POST(request: Request) {
     }
     const html = new TextDecoder("utf-8").decode(buf);
     const meta = extractMeta(html);
-    return Response.json({
-      title: meta.title,
-      description: meta.description,
-      sourceUrl: target.toString(),
-    });
+    return Response.json(
+      {
+        title: meta.title,
+        description: meta.description,
+        imageUrl: meta.image ? new URL(meta.image, target).toString() : undefined,
+        sourceUrl: target.toString(),
+      },
+      {
+        headers: {
+          "x-ratelimit-limit": String(verdict.limit),
+          "x-ratelimit-remaining": String(verdict.remaining),
+        },
+      },
+    );
   } catch (e) {
     const aborted = (e as { name?: string }).name === "AbortError";
     return Response.json({ error: aborted ? "타임아웃" : "가져오기 실패" }, { status: 502 });
@@ -82,29 +118,45 @@ export async function POST(request: Request) {
   }
 }
 
-function extractMeta(html: string): { title?: string; description?: string } {
+function extractMeta(html: string): { title?: string; description?: string; image?: string } {
   const find = (re: RegExp): string | undefined => {
     const m = html.match(re);
+    return m?.[1] ? decodeEntities(m[1].trim()) : undefined;
+  };
+  // Some sites put the content attribute before the property attribute.
+  const findAttr = (selector: RegExp, attr = "content"): string | undefined => {
+    const tag = html.match(selector)?.[0];
+    if (!tag) return undefined;
+    const m = tag.match(new RegExp(`${attr}=["']([^"']+)["']`, "i"));
     return m?.[1] ? decodeEntities(m[1].trim()) : undefined;
   };
   const title =
     find(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ??
     find(/<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i) ??
+    findAttr(/<meta[^>]+(?:property|name)=["']og:title["'][^>]*>/i) ??
     find(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const description =
     find(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i) ??
     find(/<meta[^>]+name=["']twitter:description["'][^>]+content=["']([^"']+)["']/i) ??
-    find(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
-  return { title, description };
+    find(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ??
+    findAttr(/<meta[^>]+(?:property|name)=["']og:description["'][^>]*>/i);
+  const image =
+    find(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i) ??
+    find(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i) ??
+    findAttr(/<meta[^>]+(?:property|name)=["']og:image["'][^>]*>/i) ??
+    find(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i);
+  return { title, description, image };
 }
 
 function decodeEntities(s: string): string {
   return s
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&nbsp;/g, " ")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
 }

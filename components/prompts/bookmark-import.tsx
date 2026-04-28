@@ -9,6 +9,7 @@ import { toast } from "sonner";
 interface BookmarkResult {
   title?: string;
   description?: string;
+  imageUrl?: string;
   sourceUrl: string;
 }
 
@@ -30,8 +31,14 @@ export function BookmarkImport({ onPick }: Props) {
         body: JSON.stringify({ url }),
       });
       if (!res.ok) {
-        const msg = (await res.json().catch(() => ({}))).error ?? "불러오기 실패";
-        toast.error(String(msg));
+        const body = (await res.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+        const msg = body.error ?? "불러오기 실패";
+        if (res.status === 429) {
+          const wait = body.retryAfter ?? Number(res.headers.get("retry-after") ?? 0);
+          toast.error(wait ? `${msg} (${wait}초 후)` : String(msg));
+        } else {
+          toast.error(String(msg));
+        }
         return;
       }
       const data: BookmarkResult = await res.json();

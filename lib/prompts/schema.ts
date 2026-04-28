@@ -8,6 +8,11 @@ export const promptInputSchema = z.object({
     .string()
     .optional()
     .refine((v) => !v || /^https?:\/\//.test(v), { message: "http(s) URL이어야 합니다" }),
+  imageUrl: z
+    .string()
+    .optional()
+    .refine((v) => !v || /^https?:\/\//.test(v), { message: "http(s) URL이어야 합니다" }),
+  favoritedAt: z.number().int().optional(),
 });
 
 export type PromptInput = z.infer<typeof promptInputSchema>;
@@ -33,7 +38,7 @@ const tagColorSchema = z.enum([
 ]);
 
 export const sharedPromptSchema = promptInputSchema
-  .pick({ title: true, body: true, tags: true, sourceUrl: true })
+  .pick({ title: true, body: true, tags: true, sourceUrl: true, imageUrl: true })
   .extend({ tagColors: z.record(z.string(), tagColorSchema).optional() });
 
 export type SharedPrompt = z.infer<typeof sharedPromptSchema>;

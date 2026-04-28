@@ -10,9 +10,11 @@ import { TagFilter } from "./tag-filter";
 import { PromptList } from "./prompt-list";
 import { HelpModal } from "./help-modal";
 import { PromptGuideSheet } from "./prompt-guide-sheet";
+import { UtilityPromptDialog } from "./utility-prompt-dialog";
+import { CatButterfly } from "./cat-butterfly";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, BookOpen } from "lucide-react";
+import { HelpCircle, BookOpen, Wand2 } from "lucide-react";
 
 const HELP_SEEN_KEY = "prompet:help-seen";
 
@@ -22,6 +24,7 @@ export function Workspace() {
     return !window.localStorage.getItem(HELP_SEEN_KEY);
   });
   const [guideOpen, setGuideOpen] = useState(false);
+  const [utilOpen, setUtilOpen] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -47,14 +50,15 @@ export function Workspace() {
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-4 py-10 sm:px-6">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-5 px-4 py-10 sm:px-6 xl:max-w-7xl 2xl:max-w-[88rem]">
       <motion.header
         initial={{ opacity: 0, y: -40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 380, damping: 28 }}
-        className="flex items-center justify-between border-b border-border pb-5"
+        className="border-b border-border"
       >
-        <h1 className="flex items-baseline gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-y-3 pb-2">
+        <h1 className="flex flex-wrap items-baseline gap-2">
           <motion.span
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
@@ -67,9 +71,9 @@ export function Workspace() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.18 }}
-            className="font-display text-xs italic text-muted-foreground"
+            className="hidden font-display text-xs italic text-muted-foreground sm:inline-block"
           >
-            — a local prompt manager
+            — Powered By NGA
           </motion.span>
           <Button
             variant="ghost"
@@ -83,10 +87,20 @@ export function Workspace() {
           <Button
             variant="outline"
             size="sm"
-            className="ml-1 h-7 px-2 text-xs"
+            className="ml-1 h-7 w-7 px-0 text-xs sm:w-auto sm:px-2"
+            aria-label="프롬프트 작성 가이드"
             onClick={() => setGuideOpen(true)}
           >
-            <BookOpen /> 프롬프트 작성 가이드
+            <BookOpen /> <span className="hidden sm:inline">프롬프트 작성 가이드</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-1 h-7 w-7 px-0 text-xs sm:w-auto sm:px-2"
+            aria-label="유틸리티 프롬프트"
+            onClick={() => setUtilOpen(true)}
+          >
+            <Wand2 /> <span className="hidden sm:inline">유틸리티 프롬프트</span>
           </Button>
         </h1>
         <motion.div
@@ -99,12 +113,14 @@ export function Workspace() {
             href="https://github.com/knqyf263/pet"
             target="_blank"
             rel="noopener noreferrer"
-            className="font-display text-xs italic text-muted-foreground hover:text-foreground hover:underline"
+            className="hidden font-display text-xs italic text-muted-foreground hover:text-foreground hover:underline md:inline"
           >
             inspired by knqyf263/pet ↗
           </a>
           <ThemeToggle />
         </motion.div>
+        </div>
+        <CatButterfly />
       </motion.header>
       <motion.div
         initial={{ opacity: 0, x: -60 }}
@@ -129,6 +145,7 @@ export function Workspace() {
       </motion.div>
       <HelpModal open={helpOpen} onClose={closeHelp} />
       <PromptGuideSheet open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <UtilityPromptDialog open={utilOpen} onClose={() => setUtilOpen(false)} />
     </main>
   );
 }

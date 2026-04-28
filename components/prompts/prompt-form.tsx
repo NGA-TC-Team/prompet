@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useState } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { promptInputSchema, type PromptInput, type Prompt } from "@/lib/prompts/schema";
 import { variableCount } from "@/lib/prompts/template";
 import { BookmarkImport } from "./bookmark-import";
-import { X } from "lucide-react";
+import { X, Pencil, Bookmark } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type Mode = "manual" | "bookmark";
 
 interface Props {
   initial?: Prompt | null;
@@ -18,16 +21,28 @@ interface Props {
   onCancel: () => void;
 }
 
-const DEFAULT: PromptInput = { title: "", body: "", tags: [], sourceUrl: undefined };
+const DEFAULT: PromptInput = {
+  title: "",
+  body: "",
+  tags: [],
+  sourceUrl: undefined,
+  imageUrl: undefined,
+};
 
 export function PromptForm({ initial, onSubmit, onCancel }: Props) {
+  // A prompt is treated as "bookmark" mode whenever it carries an imageUrl or
+  // a sourceUrl that came from the URL importer. New prompts default to manual.
+  const [mode, setMode] = useState<Mode>(() =>
+    initial && (initial.imageUrl || initial.sourceUrl) ? "bookmark" : "manual",
+  );
+
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     control,
     setValue,
-    reset,
+    getValues,
   } = useForm<PromptInput>({
     resolver: zodResolver(promptInputSchema),
     defaultValues: initial
@@ -36,17 +51,25 @@ export function PromptForm({ initial, onSubmit, onCancel }: Props) {
           body: initial.body,
           tags: initial.tags,
           sourceUrl: initial.sourceUrl,
+          imageUrl: initial.imageUrl,
         }
       : DEFAULT,
   });
 
-  useEffect(() => {
-    reset(
-      initial
-        ? { title: initial.title, body: initial.body, tags: initial.tags, sourceUrl: initial.sourceUrl }
-        : DEFAULT,
-    );
-  }, [initial, reset]);
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    if (next === "manual") {
+      // Drop link-only fields when leaving bookmark mode so the saved prompt
+      // doesn't keep stale URL/image data the user can no longer edit.
+      const sourceUrl = getValues("sourceUrl");
+      const imageUrl = getValues("imageUrl");
+      if (sourceUrl || imageUrl) {
+        setValue("sourceUrl", undefined, { shouldDirty: true });
+        setValue("imageUrl", undefined, { shouldDirty: true });
+      }
+    }
+    setMode(next);
+  };
 
   const body = useWatch({ control, name: "body" }) ?? "";
   const varCount = variableCount(body);
@@ -64,13 +87,19 @@ export function PromptForm({ initial, onSubmit, onCancel }: Props) {
         }
       }}
     >
-      <BookmarkImport
-        onPick={({ title, description, sourceUrl }) => {
-          if (title) setValue("title", title, { shouldDirty: true });
-          if (description) setValue("body", description, { shouldDirty: true });
-          if (sourceUrl) setValue("sourceUrl", sourceUrl, { shouldDirty: true });
-        }}
-      />
+      <ModeTabs mode={mode} onChange={switchMode} />
+
+      {mode === "bookmark" && (
+        <BookmarkImport
+          onPick={({ title, description, sourceUrl, imageUrl }) => {
+            if (title) setValue("title", title, { shouldDirty: true });
+            if (description) setValue("body", description, { shouldDirty: true });
+            if (sourceUrl) setValue("sourceUrl", sourceUrl, { shouldDirty: true });
+            setValue("imageUrl", imageUrl, { shouldDirty: true });
+          }}
+        />
+      )}
+      <input type="hidden" {...register("imageUrl")} />
 
       <div className="space-y-1.5">
         <Label htmlFor="title">제목</Label>
@@ -79,13 +108,18 @@ export function PromptForm({ initial, onSubmit, onCancel }: Props) {
       </div>
 
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <Label htmlFor="body">본문</Label>
-          {varCount > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              템플릿 변수 {varCount}개
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground tabular-nums">
+              {(body ?? "").length.toLocaleString()}자
+            </span>
+            {varCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                템플릿 변수 {varCount}개
+              </Badge>
+            )}
+          </div>
         </div>
         <Textarea
           id="body"
@@ -103,16 +137,19 @@ export function PromptForm({ initial, onSubmit, onCancel }: Props) {
         render={({ field }) => <TagsField value={field.value ?? []} onChange={field.onChange} />}
       />
 
-      <div className="space-y-1.5">
-        <Label htmlFor="sourceUrl">출처 URL (선택)</Label>
-        <Input
-          id="sourceUrl"
-          type="url"
-          placeholder="https://…"
-          {...register("sourceUrl")}
-        />
-        {errors.sourceUrl && <p className="text-xs text-destructive">{errors.sourceUrl.message}</p>}
-      </div>
+      {mode === "bookmark" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="sourceUrl">출처 URL</Label>
+          <Input
+            id="sourceUrl"
+            type="url"
+            placeholder="https://…"
+            {...register("sourceUrl")}
+          />
+          {errors.sourceUrl && <p className="text-xs text-destructive">{errors.sourceUrl.message}</p>}
+        </div>
+      )}
+      {mode === "manual" && <input type="hidden" {...register("sourceUrl")} />}
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>
@@ -123,6 +160,42 @@ export function PromptForm({ initial, onSubmit, onCancel }: Props) {
         </Button>
       </div>
     </form>
+  );
+}
+
+function ModeTabs({ mode, onChange }: { mode: Mode; onChange: (m: Mode) => void }) {
+  const tabs: Array<{ id: Mode; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+    { id: "manual", label: "직접 작성", icon: Pencil },
+    { id: "bookmark", label: "북마크 (링크)", icon: Bookmark },
+  ];
+  return (
+    <div
+      role="tablist"
+      aria-label="프롬프트 유형"
+      className="inline-flex gap-1 rounded-md border bg-muted/40 p-1"
+    >
+      {tabs.map(({ id, label, icon: Icon }) => {
+        const active = id === mode;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(id)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs font-medium transition-colors",
+              active
+                ? "bg-background text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

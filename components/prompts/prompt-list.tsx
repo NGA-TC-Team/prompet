@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useShallow } from "zustand/react/shallow";
-import { selectFiltered, usePromptStore } from "@/stores/prompt-store";
+import { selectFiltered, partitionByFavorite, usePromptStore } from "@/stores/prompt-store";
 import { useHydratePrompts } from "@/hooks/use-hydrate-prompts";
 import { PromptCard } from "./prompt-card";
 import { PromptEditorDialog } from "./prompt-editor-dialog";
@@ -68,11 +68,12 @@ export function PromptList() {
   const openEdit = (p: Prompt) => setEditing({ open: true, prompt: p });
   const close = () => setEditing({ open: false, prompt: null });
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const { favorites, rest } = useMemo(() => partitionByFavorite(filtered), [filtered]);
+  const pageCount = Math.max(1, Math.ceil(rest.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const visible = useMemo(
-    () => filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE),
-    [filtered, safePage],
+    () => [...favorites, ...rest.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)],
+    [favorites, rest, safePage],
   );
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((p) => selected.has(p.id));
@@ -260,7 +261,7 @@ export function PromptList() {
         </motion.p>
       ) : (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="columns-1 gap-3 sm:columns-2 sm:gap-4 lg:columns-3 [&>*]:mb-3 sm:[&>*]:mb-4 [&>*]:break-inside-avoid">
             <AnimatePresence mode="popLayout" initial={false}>
               {visible.map((p, i) => {
                 const dir = pickDirection(p.id, i);

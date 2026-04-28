@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { CornerDownLeft, X } from "lucide-react";
 import { useClipboard } from "@/hooks/use-clipboard";
 import { usePromptStore } from "@/stores/prompt-store";
 import { buildShareUrl } from "@/lib/prompts/share-codec";
@@ -112,10 +113,18 @@ export function TemplateFillDialog({ prompt, mode, onClose }: Props) {
             />
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>
-              취소
+            <Button type="button" variant="ghost" onClick={onClose} className="gap-1.5">
+              <X /> 취소
+              <kbd className="ml-1 inline-flex h-4 items-center rounded border bg-muted px-1 font-mono text-[10px] text-muted-foreground">
+                esc
+              </kbd>
             </Button>
-            <Button type="submit">{mode === "copy" ? "복사" : "공유 링크 만들기"}</Button>
+            <Button type="submit" className="gap-1.5">
+              <CornerDownLeft /> {mode === "copy" ? "복사" : "공유 링크 만들기"}
+              <kbd className="ml-1 inline-flex h-4 items-center rounded border border-background/40 bg-background/15 px-1 font-mono text-[10px]">
+                ↵
+              </kbd>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

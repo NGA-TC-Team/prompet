@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Variable, ExternalLink } from "lucide-react";
+import { Copy, Variable, ExternalLink, ImageOff } from "lucide-react";
 import { useClipboard } from "@/hooks/use-clipboard";
 import { hasVariables, variableCount } from "@/lib/prompts/template";
 import { TemplateFillDialog } from "./template-fill-dialog";
@@ -15,6 +15,7 @@ export function SharedPromptView({ prompt }: { prompt: SharedPrompt }) {
   const copy = useClipboard();
   const [filling, setFilling] = useState(false);
   const isTemplate = hasVariables(prompt.body);
+  const isBookmark = Boolean(prompt.imageUrl);
   const haloColors: TagColor[] = (() => {
     if (!prompt.tagColors) return [];
     const seen = new Set<TagColor>();
@@ -30,6 +31,10 @@ export function SharedPromptView({ prompt }: { prompt: SharedPrompt }) {
   })();
 
   const onCopy = () => {
+    if (isBookmark && prompt.sourceUrl) {
+      window.open(prompt.sourceUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     if (isTemplate) setFilling(true);
     else void copy(prompt.body, "프롬프트를 복사했습니다");
   };
@@ -54,9 +59,35 @@ export function SharedPromptView({ prompt }: { prompt: SharedPrompt }) {
           )}
         </CardHeader>
         <CardContent className="space-y-4">
-          <pre className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 font-mono text-xs">
-            {prompt.body}
-          </pre>
+          {isBookmark && prompt.imageUrl ? (
+            <div className="group overflow-hidden rounded-md border bg-muted/40">
+              <div className="aspect-[4/3] w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={prompt.imageUrl}
+                  alt={prompt.title}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+                  onError={(e) => {
+                    const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                    e.currentTarget.style.display = "none";
+                    if (fb) fb.style.display = "flex";
+                  }}
+                />
+                <div
+                  style={{ display: "none" }}
+                  className="h-full w-full items-center justify-center bg-muted text-muted-foreground"
+                >
+                  <ImageOff className="h-6 w-6" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <pre className="whitespace-pre-wrap rounded-md border bg-muted/40 p-3 font-mono text-xs tracking-[-0.015em]">
+              {prompt.body}
+            </pre>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {isTemplate && (
               <Badge variant="secondary" className="gap-1">
@@ -79,7 +110,19 @@ export function SharedPromptView({ prompt }: { prompt: SharedPrompt }) {
             })}
           </div>
           <Button onClick={onCopy} className="w-full">
-            <Copy /> {isTemplate ? "변수 채우고 복사" : "복사"}
+            {isBookmark ? (
+              <>
+                <ExternalLink /> 원문 보기
+              </>
+            ) : isTemplate ? (
+              <>
+                <Copy /> 변수 채우고 복사
+              </>
+            ) : (
+              <>
+                <Copy /> 복사
+              </>
+            )}
           </Button>
         </CardContent>
       </Card>

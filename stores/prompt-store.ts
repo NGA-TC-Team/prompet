@@ -30,7 +30,10 @@ interface PromptState {
   seedExamples: () => Promise<Prompt[]>;
   removeMany: (ids: string[]) => Promise<void>;
   bulkEditTags: (ids: string[], add: string[], removeTags: string[]) => Promise<void>;
+  toggleFavorite: (id: string) => Promise<{ ok: true } | { ok: false; reason: "limit" }>;
 }
+
+export const FAVORITE_LIMIT = 10;
 
 export const usePromptStore = create<PromptState>((set, get) => ({
   prompts: [],
@@ -130,6 +133,22 @@ export const usePromptStore = create<PromptState>((set, get) => ({
     set({ prompts: next });
   },
 
+  toggleFavorite: async (id) => {
+    const existing = get().prompts.find((p) => p.id === id);
+    if (!existing) return { ok: false, reason: "limit" };
+    const isFav = Boolean(existing.favoritedAt);
+    if (!isFav) {
+      const count = get().prompts.filter((p) => p.favoritedAt).length;
+      if (count >= FAVORITE_LIMIT) return { ok: false, reason: "limit" };
+    }
+    const next: Prompt = isFav
+      ? { ...existing, favoritedAt: undefined, updatedAt: existing.updatedAt }
+      : { ...existing, favoritedAt: Date.now() };
+    await db.putPrompt(next);
+    set({ prompts: get().prompts.map((p) => (p.id === id ? next : p)) });
+    return { ok: true };
+  },
+
   setTagColor: async (tag, color) => {
     if (color === DEFAULT_TAG_COLOR) {
       await db.deleteTagColor(tag);
@@ -158,6 +177,15 @@ export function selectFiltered(state: PromptState): Prompt[] {
       p.tags.some((t) => t.toLowerCase().includes(q))
     );
   });
+}
+
+export function partitionByFavorite(list: Prompt[]): { favorites: Prompt[]; rest: Prompt[] } {
+  const favorites = list
+    .filter((p) => p.favoritedAt)
+    .slice()
+    .sort((a, b) => (b.favoritedAt ?? 0) - (a.favoritedAt ?? 0));
+  const rest = list.filter((p) => !p.favoritedAt);
+  return { favorites, rest };
 }
 
 export function selectAllTags(state: PromptState): string[] {

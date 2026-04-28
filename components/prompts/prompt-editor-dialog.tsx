@@ -40,6 +40,7 @@ export function PromptEditorDialog({ open, prompt, onClose }: Props) {
           </SheetDescription>
         </SheetHeader>
         <PromptForm
+          key={prompt?.id ?? "new"}
           initial={prompt}
           onCancel={onClose}
           onSubmit={async (values) => {
